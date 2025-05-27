@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EML File Viewer</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script src="eml-format.js"></script>
+</head>
+<body>
+  <div id="app">
+    <div class="container">
+      <h1>EML File Viewer</h1>
+      
+      <div class="upload-section">
+        <input 
+          type="file" 
+          @change="handleFileUpload" 
+          accept=".eml"
+          id="file-input"
+          ref="fileInput"
+          class="file-input"
+        >
+        <label for="file-input" class="file-label">
+          {{ loading ? 'Processing...' : 'Choose EML File' }}
+        </label>
+        <div v-if="loading" class="loading">
+          <div class="spinner"></div>
+          <p>Parsing email file...</p>
+        </div>
+        <div v-if="error" class="error">{{ error }}</div>
+      </div>
+
+      <div v-if="email" class="email-content">
+        <div class="email-header">
+          <div class="header-item">
+            <strong>From:</strong> {{ email.from }}
+          </div>
+          <div class="header-item">
+            <strong>To:</strong> {{ email.to }}
+          </div>
+          <div class="header-item" v-if="email.cc">
+            <strong>CC:</strong> {{ email.cc }}
+          </div>
+          <div class="header-item">
+            <strong>Subject:</strong> {{ email.subject }}
+          </div>
+          <div class="header-item">
+            <strong>Date:</strong> {{ email.date }}
+          </div>
+        </div>
+
+        <div class="email-body-section">
+          <h3>Email Body</h3>
+          <div class="email-body" v-html="email.body"></div>
+        </div>
+
+        <div v-if="email.attachments && email.attachments.length > 0" class="attachments">
+          <h3>Attachments ({{ email.attachments.length }})</h3>
+          <div class="attachment-list">
+            <div v-for="(attachment, index) in email.attachments" :key="index" class="attachment-item">
+              <div v-if="isImageAttachment(attachment)" class="image-attachment">
+                <img :src="attachment.content" :alt="attachment.filename" @error="$event.target.style.display='none'">
+                <p><strong>{{ attachment.filename }}</strong></p>
+                <p class="file-info">{{ formatFileSize(attachment.size) }}</p>
+                <button @click="downloadAttachment(attachment)" class="download-btn">Download</button>
+              </div>
+              <div v-else class="file-attachment">
+                <div class="file-icon">📎</div>
+                <p><strong>{{ attachment.filename }}</strong></p>
+                <p class="file-info">
+                  {{ attachment.contentType }}<br>
+                  {{ formatFileSize(attachment.size) }}
+                </p>
+                <button @click="downloadAttachment(attachment)" class="download-btn">Download</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div v-else-if="email" class="no-attachments">
+          <p><em>No attachments found</em></p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
