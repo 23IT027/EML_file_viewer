@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EML File Reader</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Import Vue.js -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+</head>
+<body>
+    <div id="app">
+        <div class="container">
+            <h1><span class="email-icon">📧</span> EML File Reader</h1>
+            
+            <!-- Upload Section -->
+            <div v-if="!email" class="upload-section">
+                <input 
+                    type="file" 
+                    id="file-input" 
+                    class="file-input"
+                    @change="handleFile" 
+                    accept=".eml" 
+                />
+                <label for="file-input" class="file-label">
+                    Choose EML File
+                </label>
+                <p style="margin-top: 1rem; color: #6c757d;">
+                    Select an .eml email file to view its contents
+                </p>
+            </div>
+
+            <!-- Loading -->
+            <div v-if="loading" class="loading">
+                <div class="spinner"></div>
+                <p>Parsing email...</p>
+            </div>
+
+            <!-- Error -->
+            <div v-if="error" class="error">
+                {{ error }}
+            </div>
+
+            <!-- Email Content -->
+            <div v-if="email" class="email-content">
+                <button @click="reset" class="reset-btn">← Upload New File</button>
+                
+                <!-- Email Headers -->
+                <div class="email-header">
+                    <div class="header-item">
+                        <strong>From:</strong> {{ email.from }}
+                    </div>
+                    <div class="header-item" v-if="email.to">
+                        <strong>To:</strong> {{ email.to }}
+                    </div>
+                    <div class="header-item" v-if="email.cc">
+                        <strong>CC:</strong> {{ email.cc }}
+                    </div>
+                    <div class="header-item">
+                        <strong>Subject:</strong> {{ email.subject }}
+                    </div>
+                    <div class="header-item" v-if="email.date">
+                        <strong>Date:</strong> {{ email.date }}
+                    </div>
+                </div>
+
+                <!-- Email Body -->
+                <div class="email-body-section">
+                    <h3>Message Content</h3>
+                    <div class="email-body">
+                        <div v-if="email.html" v-html="email.html"></div>
+                        <pre v-else-if="email.text">{{ email.text }}</pre>
+                        <div v-else class="no-content">
+                            <p>No message content available</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Attachments -->
+                <div v-if="email.attachments && email.attachments.length" class="attachments">
+                    <h3>Attachments ({{ email.attachments.length }})</h3>
+                    <div class="attachment-list">
+                        <div 
+                            v-for="(attachment, index) in email.attachments" 
+                            :key="index"
+                            class="attachment-item"
+                        >
+                            <!-- Image Attachment -->
+                            <div v-if="isImage(attachment)" class="image-attachment">
+                                <img :src="getDataUrl(attachment)" :alt="attachment.name" />
+                                <div class="file-details">
+                                    <div>{{ attachment.name }}</div>
+                                    <div class="file-info">{{ formatFileSize(attachment.size) }}</div>
+                                    <button @click="download(attachment)" class="download-btn">
+                                        Download
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- File Attachment -->
+                            <div v-else class="file-attachment">
+                                <div class="file-icon">{{ getFileIcon(attachment.name) }}</div>
+                                <div class="file-details">
+                                    <div>{{ attachment.name }}</div>
+                                    <div class="file-info">{{ formatFileSize(attachment.size) }}</div>
+                                    <button @click="download(attachment)" class="download-btn">
+                                        Download
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import our JavaScript files -->
+    <script src="app.js"></script>
+</body>
+</html>
