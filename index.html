@@ -7,6 +7,12 @@
     <link rel="stylesheet" href="styles.css">
     <!-- Import Vue.js -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- Import PDF.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <!-- Import Mammoth.js for DOCX -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+    <!-- Import JSZip for PPTX -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 <body>
     <div id="app">
@@ -91,9 +97,14 @@
                                 <div class="file-details">
                                     <div>{{ attachment.name }}</div>
                                     <div class="file-info">{{ formatFileSize(attachment.size) }}</div>
-                                    <button @click="download(attachment)" class="download-btn">
-                                        Download
-                                    </button>
+                                    <div class="attachment-buttons">
+                                        <button @click="previewAttachment(attachment)" class="preview-btn">
+                                            Preview
+                                        </button>
+                                        <button @click="download(attachment)" class="download-btn">
+                                            Download
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
 
@@ -103,13 +114,129 @@
                                 <div class="file-details">
                                     <div>{{ attachment.name }}</div>
                                     <div class="file-info">{{ formatFileSize(attachment.size) }}</div>
-                                    <button @click="download(attachment)" class="download-btn">
-                                        Download
-                                    </button>
+                                    <div class="attachment-buttons">
+                                        <button @click="previewAttachment(attachment)" class="preview-btn" :disabled="previewModal.loading">
+                                            <span v-if="previewModal.loading && previewModal.currentFile === attachment.name">Loading...</span>
+                                            <span v-else>Preview</span>
+                                        </button>
+                                        <button @click="download(attachment)" class="download-btn">
+                                            Download
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Preview Modal -->
+        <div v-if="previewModal.show" class="modal-overlay" @click="closePreview">
+            <div class="modal-content" @click.stop>
+                <div class="modal-header">
+                    <h3>{{ previewModal.attachment.name }}</h3>
+                    <div class="modal-controls">
+                        <button v-if="previewModal.type === 'pdf'" @click="toggleFullscreen" class="fullscreen-btn">
+                            {{ previewModal.fullscreen ? '⤓' : '⤢' }}
+                        </button>
+                        <button @click="closePreview" class="close-btn">×</button>
+                    </div>
+                </div>
+                
+                <!-- Loading State -->
+                <div v-if="previewModal.loading" class="modal-loading">
+                    <div class="spinner"></div>
+                    <p>Loading preview...</p>
+                </div>
+                
+                <div v-else class="modal-body" :class="{ 'fullscreen': previewModal.fullscreen }">
+                    <!-- Image Preview -->
+                    <div v-if="previewModal.type === 'image'" class="preview-image">
+                        <img :src="previewModal.content" :alt="previewModal.attachment.name" />
+                    </div>
+                    
+                    <!-- Text Preview -->
+                    <div v-else-if="previewModal.type === 'text'" class="preview-text">
+                        <pre>{{ previewModal.content }}</pre>
+                    </div>
+                    
+                    <!-- PDF Preview -->
+                    <div v-else-if="previewModal.type === 'pdf'" class="preview-pdf">
+                        <div class="pdf-controls">
+                            <button @click="previousPage" :disabled="previewModal.currentPage <= 1">Previous</button>
+                            <span>Page {{ previewModal.currentPage }} of {{ previewModal.totalPages }}</span>
+                            <button @click="nextPage" :disabled="previewModal.currentPage >= previewModal.totalPages">Next</button>
+                            <button @click="zoomOut">Zoom Out</button>
+                            <span>{{ Math.round(previewModal.scale * 100) }}%</span>
+                            <button @click="zoomIn">Zoom In</button>
+                        </div>
+                        <div class="pdf-container">
+                            <canvas ref="pdfCanvas" class="pdf-canvas"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- DOCX Preview -->
+                    <div v-else-if="previewModal.type === 'docx'" class="preview-docx">
+                        <div class="docx-content" v-html="previewModal.content"></div>
+                    </div>
+                    
+                    <!-- PPTX Preview -->
+                    <div v-else-if="previewModal.type === 'pptx'" class="preview-pptx">
+                        <div class="pptx-controls">
+                            <button @click="previousSlide" :disabled="previewModal.currentSlide <= 0">Previous Slide</button>
+                            <span>Slide {{ previewModal.currentSlide + 1 }} of {{ previewModal.slides.length }}</span>
+                            <button @click="nextSlide" :disabled="previewModal.currentSlide >= previewModal.slides.length - 1">Next Slide</button>
+                        </div>
+                        <div class="pptx-slide">
+                            <div v-if="previewModal.slides[previewModal.currentSlide]" v-html="previewModal.slides[previewModal.currentSlide]"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- HTML Preview -->
+                    <div v-else-if="previewModal.type === 'html'" class="preview-html">
+                        <iframe :srcdoc="previewModal.content" frameborder="0"></iframe>
+                    </div>
+                    
+                    <!-- Audio Preview -->
+                    <div v-else-if="previewModal.type === 'audio'" class="preview-audio">
+                        <audio controls :src="previewModal.content">
+                            Your browser does not support the audio element.
+                        </audio>
+                    </div>
+                    
+                    <!-- Video Preview -->
+                    <div v-else-if="previewModal.type === 'video'" class="preview-video">
+                        <video controls :src="previewModal.content">
+                            Your browser does not support the video element.
+                        </video>
+                    </div>
+                    
+                    <!-- Error State -->
+                    <div v-else-if="previewModal.type === 'error'" class="preview-error">
+                        <div class="error-icon">⚠️</div>
+                        <p>Failed to load preview</p>
+                        <p class="error-message">{{ previewModal.content }}</p>
+                    </div>
+                    
+                    <!-- Unsupported Preview -->
+                    <div v-else class="preview-unsupported">
+                        <div class="unsupported-icon">📄</div>
+                        <p>Preview not available for this file type</p>
+                        <p class="file-info">{{ previewModal.attachment.name }}</p>
+                        <button @click="download(previewModal.attachment)" class="download-btn">
+                            Download to View
+                        </button>
+                    </div>
+                </div>
+                
+                <div v-if="!previewModal.loading" class="modal-footer">
+                    <button @click="download(previewModal.attachment)" class="download-btn">
+                        Download
+                    </button>
+                    <button @click="closePreview" class="close-btn-secondary">
+                        Close
+                    </button>
                 </div>
             </div>
         </div>
